@@ -22,6 +22,7 @@ from evaluate import load_test_data, load_trained_model, predict_probabilities
 # match your current evaluate.py
 TEST_DATA_PATH = "data/processed/test_scaled.csv"
 MODEL_PATH = "models/is_fraud_model.pth"
+HISTORY_PATH = "models/training_history.json"
 THRESHOLD = 0.3
 
 OUTPUT_DIR = "output/evaluation_plots"
@@ -29,6 +30,24 @@ OUTPUT_DIR = "output/evaluation_plots"
 
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
+
+
+def load_training_history(history_path):
+    if not os.path.exists(history_path):
+        raise FileNotFoundError(
+            f"Training history file not found: {history_path}\n"
+            f"Please run train.py first so that training_history.json is created."
+        )
+
+    with open(history_path, "r") as f:
+        history = json.load(f)
+
+    required_keys = ["train_loss", "val_loss", "train_accuracy", "val_accuracy"]
+    for key in required_keys:
+        if key not in history:
+            raise KeyError(f"Missing '{key}' in training history file.")
+
+    return history
 
 
 def build_threshold_table(y_true, y_prob, max_points=200):
@@ -69,6 +88,14 @@ def build_threshold_table(y_true, y_prob, max_points=200):
 def main():
     ensure_dir(OUTPUT_DIR)
 
+    # load training history
+    history = load_training_history(HISTORY_PATH)
+    train_acc = history["train_accuracy"]
+    val_acc = history["val_accuracy"]
+    train_loss = history["train_loss"]
+    val_loss = history["val_loss"]
+
+    # load test data and model
     X_test, y_test = load_test_data(TEST_DATA_PATH)
     model, device = load_trained_model(MODEL_PATH, input_dim=X_test.shape[1])
 
@@ -200,7 +227,33 @@ def main():
     plt.savefig(os.path.join(OUTPUT_DIR, "8_metric_bar_chart.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
-    print(f"Saved 8 graphs to: {OUTPUT_DIR}")
+    # 9. accuracy curve
+    epochs_acc = range(1, len(train_acc) + 1)
+    plt.figure()
+    plt.plot(epochs_acc, train_acc, label="Train Accuracy")
+    plt.plot(epochs_acc, val_acc, label="Validation Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Training and Validation Accuracy")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "9_accuracy_curve.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    # 10. loss curve
+    epochs_loss = range(1, len(train_loss) + 1)
+    plt.figure()
+    plt.plot(epochs_loss, train_loss, label="Train Loss")
+    plt.plot(epochs_loss, val_loss, label="Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training and Validation Loss")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "10_loss_curve.png"), dpi=300, bbox_inches="tight")
+    plt.close()
+
+    print(f"Saved 10 graphs to: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":
